@@ -1,6 +1,7 @@
 package io.github.mandar2812.dynaml.graphutils
 
-import com.tinkerpop.frames.{Property, VertexFrame}
+import com.tinkerpop.blueprints.Direction
+import com.tinkerpop.frames.{Incidence, Property, VertexFrame}
 
 /**
  * Outline of a Neuron
@@ -14,5 +15,11 @@ trait Neuron extends VertexFrame {
 
   @Property("layer")
   def getLayer(): Int
+
+  @Incidence(label = "synapse", direction = Direction.IN)
+  def getIncomingSynapses(): java.lang.Iterable[Synapse]
+
+  @Incidence(label = "synapse", direction = Direction.OUT)
+  def getOutgoingSynapses(): java.lang.Iterable[Synapse]
 
 }
