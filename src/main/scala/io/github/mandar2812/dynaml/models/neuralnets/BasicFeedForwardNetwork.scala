@@ -10,7 +10,8 @@ import com.tinkerpop.frames.FramedGraph
  */
 abstract class BasicFeedForwardNetwork[G]
   extends NeuralNetwork[G, FramedGraph[Graph]]{
-  
+
+  val feedForward = BasicFeedForwardNetwork.feedForwardFunc(params) _
 
 }
 
