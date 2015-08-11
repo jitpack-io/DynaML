@@ -16,23 +16,22 @@ import scalax.chart.module.ChartFactories.{XYAreaChart, XYLineChart}
 class BinaryClassificationMetricsSpark(
   protected val scores: RDD[(Double, Double)],
   val len: Long, minmax: (Double, Double))
-  extends Metrics[Double]{
+  extends Metrics[Double, Double]{
 
   override protected val scoresAndLabels = List()
 
   private val logger = Logger.getLogger(this.getClass)
   val length = len
 
+  private val (scMin, scMax) = minmax
+
   /**
    * A list of threshold values from
-   * -1.0 to 1.0 in 100 steps. These
+   * min score to 1.0 in max score steps. These
    * will be used to measure the variation
    * in precision, recall False Positive
    * and False Negative values.
    * */
-
-  private val (scMin, scMax) = minmax
-
   private val thresholds = List.tabulate(100)(i => {
     scMin +
       i.toDouble*((scMax.toInt -
@@ -45,8 +44,7 @@ class BinaryClassificationMetricsSpark(
   def scores_and_labels = this.scoresAndLabels
 
   private def areaUnderCurve(points: List[(Double, Double)]): Double =
-    points.sliding(2)
-      .map(l => (l(1)._1 - l.head._1) * (l(1)._2 + l.head._2)/2).sum
+    BinaryClassificationMetrics.areaUnderCurve(points)
 
 
   /**

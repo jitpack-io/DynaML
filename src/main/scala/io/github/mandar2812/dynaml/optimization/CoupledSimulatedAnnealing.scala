@@ -13,9 +13,9 @@ import scala.util.Random
  * Implementation of the Coupled Simulated Annealing algorithm
  * for global optimization.
  */
-class CoupledSimulatedAnnealing[G, H, M <: KernelizedModel[G, H, DenseVector[Double],
-  DenseVector[Double], Double, Int, Int]](model: M)
-  extends GridSearch[G, H, M](model: M){
+class CoupledSimulatedAnnealing[G, H, U, M <: KernelizedModel[G, H, DenseVector[Double],
+  DenseVector[Double], Double, U, Int, Int]](model: M)
+  extends GridSearch[G, H, U, M](model: M){
 
   protected var MAX_ITERATIONS: Int = 10
 

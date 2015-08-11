@@ -89,9 +89,9 @@ trait ParameterizedLearner[G, K, T, Q <: Tensor[K, Double], R, S]
  * */
 
 abstract class LinearModel[T, K1, K2,
-  P <: Tensor[K1, Double], Q <: Tensor[K2, Double], R, S]
+  P <: Tensor[K1, Double], Q <: Tensor[K2, Double], R, U, S]
   extends ParameterizedLearner[T, K2, P, Q, R, S]
-  with EvaluableModel[P, R] {
+  with EvaluableModel[P, U, R] {
 
   /**
    * Predict the value of the
@@ -114,13 +114,13 @@ abstract class LinearModel[T, K1, K2,
  * @tparam P The type of the model's Parameters
  * @tparam R The type of the output value
  * */
-trait EvaluableModel [P, R]{
-  def evaluate(config: Map[String, String]): Metrics[R]
+trait EvaluableModel [P, Q, R]{
+  def evaluate(config: Map[String, String]): Metrics[Q, R]
 }
 
 abstract class KernelizedModel[G, L, T <: Tensor[K1, Double],
-Q <: Tensor[K2, Double], R, K1, K2](protected val task: String)
-  extends LinearModel[G, K1, K2, T, Q, R, L] with GloballyOptimizable {
+Q <: Tensor[K2, Double], R, U, K1, K2](protected val task: String)
+  extends LinearModel[G, K1, K2, T, Q, R, U, L] with GloballyOptimizable {
 
   override protected var hyper_parameters: List[String] = List("RegParam")
 
@@ -205,7 +205,7 @@ Q <: Tensor[K2, Double], R, K1, K2](protected val task: String)
 
   def evaluateFold(params: T)
                   (test_data_set: L)
-                  (task: String): Metrics[Double]
+                  (task: String): Metrics[U, R]
 
   def applyFeatureMap: Unit
 
@@ -249,21 +249,21 @@ Q <: Tensor[K2, Double], R, K1, K2](protected val task: String)
 
     val (_,_,e) = this.crossvalidate(4, h("RegParam"), optionalStateFlag = kernelflag)
     current_state = h
-    1.0-e
+    1.0-e.asInstanceOf[Double]
   }
 
 }
 
 object KernelizedModel {
-  def getOptimizedModel[G, H, M <: KernelizedModel[G, H, DenseVector[Double],
-    DenseVector[Double], Double, Int, Int]](model: M, globalOptMethod: String,
+  def getOptimizedModel[G, H, U, M <: KernelizedModel[G, H, DenseVector[Double],
+    DenseVector[Double], Double, U, Int, Int]](model: M, globalOptMethod: String,
                                             kernel: String, prototypes: Int, grid: Int,
                                             step: Double, logscale: Boolean = true) = {
     val gs = globalOptMethod match {
-      case "gs" => new GridSearch[G, H, model.type](model).setGridSize(grid)
+      case "gs" => new GridSearch[G, H, U, model.type](model).setGridSize(grid)
         .setStepSize(step).setLogScale(logscale)
 
-      case "csa" => new CoupledSimulatedAnnealing[G, H, model.type](model).setGridSize(grid)
+      case "csa" => new CoupledSimulatedAnnealing[G, H, U, model.type](model).setGridSize(grid)
         .setStepSize(step).setLogScale(logscale).setMaxIterations(5)
     }
 

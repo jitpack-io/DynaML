@@ -15,7 +15,7 @@ import scalax.chart.module.ChartFactories.{XYBarChart, XYLineChart, XYAreaChart}
 class RegressionMetrics(
     override protected val scoresAndLabels: List[(Double, Double)],
     val len: Int)
-  extends Metrics[Double] {
+  extends Metrics[Double, Double] {
   private val logger = Logger.getLogger(this.getClass)
   val length: Int = len
 

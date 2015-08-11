@@ -36,7 +36,7 @@ object TestHousing {
     }
 
     val (optModel, optConfig) = KernelizedModel.getOptimizedModel[FramedGraph[Graph],
-      Iterable[CausalEdge], model.type](model, globalOptMethod,
+      Iterable[CausalEdge], Double, model.type](model, globalOptMethod,
         kernel, nProt, grid, step, logscale)
 
     optModel.setMaxIterations(40).learn()
