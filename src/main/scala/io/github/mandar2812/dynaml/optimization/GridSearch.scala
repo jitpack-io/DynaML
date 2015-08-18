@@ -1,6 +1,7 @@
 package io.github.mandar2812.dynaml.optimization
 
 import breeze.linalg.DenseVector
+import io.github.mandar2812.dynaml.models.svm.{LSSVMTurbo, LSSVMSparkModel}
 import org.apache.log4j.Logger
 import io.github.mandar2812.dynaml.models.KernelizedModel
 import io.github.mandar2812.dynaml.utils
@@ -11,10 +12,10 @@ import io.github.mandar2812.dynaml.utils
  * An implementation of Grid Search
  * global optimization for Kernel Models
  */
-class GridSearch[G, H, M <: KernelizedModel[G, H, DenseVector[Double],
-DenseVector[Double], Double, Int, Int]](model: M)
+class GridSearch[G, H, U, M <: KernelizedModel[G, H, DenseVector[Double],
+DenseVector[Double], Double, U, Int, Int]](model: M)
   extends GlobalOptimizer[KernelizedModel[G, H, DenseVector[Double],
-    DenseVector[Double], Double, Int, Int]]{
+    DenseVector[Double], Double, U, Int, Int]]{
 
   protected val logger = Logger.getLogger(this.getClass)
 
@@ -57,16 +58,27 @@ DenseVector[Double], Double, Int, Int]](model: M)
 
     val grid = utils.combine(gridvecs.map(_._2)).map(x => DenseVector(x.toArray))
 
-    val energyLandscape = grid.map((config) => {
-      val configMap = List.tabulate(config.length){i => (hyper_params(i), config(i))}.toMap
-      logger.info("Evaluating Configuration: "+configMap)
+    val energyLandscape = system match {
+      /*case system: LSSVMTurbo => {
 
-      val configEnergy = system.energy(configMap, options)
+      }*/
 
-      logger.info("Energy = "+configEnergy+"\n")
+      case _ =>
+        def configAsMap(config:DenseVector[Double]): Map[String, Double] =
+          List.tabulate(config.length){i => (hyper_params(i), config(i))}.toMap
 
-      (configEnergy, configMap)
-    }).toMap
+        grid.map((config) => {
+          val configMap = configAsMap(config)
+          logger.info("Evaluating Configuration: "+configMap)
+
+          val configEnergy = system.energy(configMap, options)
+
+          logger.info("Energy = "+configEnergy+"\n")
+
+          (configEnergy, configMap)
+        }).toMap
+
+    }
 
     val optimum = energyLandscape.keys.min
 

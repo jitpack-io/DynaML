@@ -17,7 +17,7 @@ import scalax.chart.module.ChartFactories.{XYBarChart, XYLineChart, XYAreaChart}
 
 class RegressionMetricsSpark(protected val scores: RDD[(Double, Double)],
                              val len: Long)
-  extends Metrics[Double] {
+  extends Metrics[Double, Double] {
 
   override protected val scoresAndLabels = List()
   private val logger = Logger.getLogger(this.getClass)

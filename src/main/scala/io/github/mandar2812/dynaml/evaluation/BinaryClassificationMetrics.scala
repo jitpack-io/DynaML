@@ -15,7 +15,7 @@ import scalax.chart.module.ChartFactories.{XYAreaChart, XYLineChart}
 class BinaryClassificationMetrics(
     override protected val scoresAndLabels: List[(Double, Double)],
     val len: Int)
-  extends Metrics[Double]{
+  extends Metrics[Double, Double]{
 
   private val logger = Logger.getLogger(this.getClass)
   val length = len
@@ -39,7 +39,7 @@ class BinaryClassificationMetrics(
   def scores_and_labels = this.scoresAndLabels
 
   private def areaUnderCurve(points: List[(Double, Double)]): Double =
-    points.sliding(2).map(l => (l(1)._1 - l(0)._1) * (l(1)._2 + l(0)._2)/2).sum
+    BinaryClassificationMetrics.areaUnderCurve(points)
 
   /**
    * Calculate the area under the Precision-Recall
@@ -160,4 +160,10 @@ class BinaryClassificationMetrics(
   override def kpi() = DenseVector(accuracyByThreshold().map((c) => c._2).max,
     fMeasureByThreshold().map((c) => c._2).max,
     areaUnderROC())
+}
+
+object BinaryClassificationMetrics {
+
+  def areaUnderCurve(points: List[(Double, Double)]): Double =
+  points.sliding(2).map(l => (l(1)._1 - l(0)._1) * (l(1)._2 + l(0)._2)/2).sum
 }

@@ -62,7 +62,7 @@ class LSSVMModel(
     case "regression" => this.score(point)
   }
 
-  override def evaluate(config: Map[String, String]): Metrics[Double] = {
+  override def evaluate(config: Map[String, String]): Metrics[Double, Double] = {
     val (file, delim, head, _) = LSSVMModel.readConfig(config)
     logger.log(Priority.INFO, "Calculating test set predictions")
     val reader = utils.getCSVReader(file, delim)
@@ -124,7 +124,7 @@ class LSSVMModel(
 
   override def evaluateFold(params: DenseVector[Double])
                            (test_data_set: Iterable[CausalEdge])
-                           (task: String): Metrics[Double] = {
+                           (task: String): Metrics[Double, Double] = {
     var index: Int = 1
     val scorepred: (DenseVector[Double]) => Double = params dot _
     val scoreFunction = task match {

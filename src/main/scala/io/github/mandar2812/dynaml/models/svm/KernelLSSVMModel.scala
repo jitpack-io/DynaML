@@ -37,7 +37,7 @@ import scala.util.Random
  */
 abstract class KernelLSSVMModel(implicit override protected val task: String) extends
 KernelizedModel[FramedGraph[Graph], Iterable[CausalEdge],
-  DenseVector[Double], DenseVector[Double], Double, Int, Int](task) {
+  DenseVector[Double], DenseVector[Double], Double, Double, Int, Int](task) {
 
   protected val logger = Logger.getLogger(this.getClass)
 

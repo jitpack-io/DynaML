@@ -60,7 +60,7 @@ object TestSUSY {
 
     conf.registerKryoClasses(Array(classOf[LSSVMSparkModel], classOf[KernelSparkModel],
       classOf[KernelizedModel[RDD[(Long, LabeledPoint)], RDD[LabeledPoint],
-        DenseVector[Double], DenseVector[Double], Double, Int, Int]],
+        DenseVector[Double], DenseVector[Double], Double, Double, Int, Int]],
       classOf[SVMKernel[DenseMatrix[Double]]], classOf[RBFKernel],
       classOf[DenseVector[Double]],
       classOf[DenseMatrix[Double]]))
@@ -80,7 +80,7 @@ object TestSUSY {
 
     model.setBatchFraction(frac)
     val (optModel, optConfig) = KernelizedModel.getOptimizedModel[RDD[(Long, LabeledPoint)],
-      RDD[LabeledPoint], model.type](model, globalOptMethod,
+      RDD[LabeledPoint], Double, model.type](model, globalOptMethod,
         kernel, nProt, grid, step, logscale)
 
     optModel.setMaxIterations(2).learn()

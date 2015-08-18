@@ -128,7 +128,7 @@ class LSSVMSparkModel(data: RDD[LabeledPoint], task: String)
 
   override def evaluateFold(params: DenseVector[Double])
                            (test_data_set: RDD[LabeledPoint])
-                           (task: String): Metrics[Double] = {
+                           (task: String): Metrics[Double, Double] = {
     val sc = test_data_set.context
     var index: Accumulator[Long] = sc.accumulator(1)
 
@@ -211,7 +211,7 @@ object LSSVMSparkModel {
     Vectors.dense(ans.toArray)
   }
 
-  def apply(implicit config: Map[String, String], sc: SparkContext): LSSVMSparkModel = {
+  def generateRDD(implicit config: Map[String, String], sc: SparkContext): (RDD[LabeledPoint], String) = {
     val (file, delim, head, task) = LSSVMModel.readConfig(config)
     val minPartitions = if(config.contains("parallelism") &&
       config.contains("executors") && config.contains("factor"))
@@ -231,7 +231,11 @@ object LSSVMSparkModel {
       case false =>
         csv
     }
+    (data, task)
+  }
 
+  def apply(implicit config: Map[String, String], sc: SparkContext): LSSVMSparkModel = {
+    val (data, task) = generateRDD(config, sc)
     new LSSVMSparkModel(data, task)
   }
 
