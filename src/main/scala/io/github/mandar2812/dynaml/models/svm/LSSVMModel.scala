@@ -9,9 +9,12 @@ import com.tinkerpop.blueprints.{Graph, GraphFactory}
 import com.tinkerpop.frames.{FramedGraph, FramedGraphFactory}
 import io.github.mandar2812.dynaml.evaluation.Metrics
 import io.github.mandar2812.dynaml.graphutils.{CausalEdge, Label, ParamEdge, Parameter, _}
+import io.github.mandar2812.dynaml.kernels.SVMKernel
 import io.github.mandar2812.dynaml.optimization._
 import io.github.mandar2812.dynaml.utils
 import org.apache.log4j.{Logger, Priority}
+import org.apache.spark.mllib.regression.LabeledPoint
+import org.apache.spark.rdd.RDD
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable

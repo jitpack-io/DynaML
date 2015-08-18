@@ -74,6 +74,14 @@ KernelizedModel[FramedGraph[Graph], Iterable[CausalEdge],
       this.g.getEdges("relation", "causal", classOf[CausalEdge])
     )
 
+  def filterXYEdges(fn : (Long) => Boolean) = (1L to nPoints).view.filter(fn).map{
+    i => {
+      this.g.getEdge(edgeMaps._1(i),
+        classOf[CausalEdge])
+
+    }
+  }
+
   /**
    * Get a subset of the data set defined
    * as a filter operation on the raw data set.
