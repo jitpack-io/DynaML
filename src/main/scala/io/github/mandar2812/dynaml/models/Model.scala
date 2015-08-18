@@ -259,15 +259,15 @@ Q <: Tensor[K2, Double], R, U, K1, K2](protected val task: String)
 
 object KernelizedModel {
   def getOptimizedModel[G, H, M <: KernelizedModel[G, H, DenseVector[Double],
-    DenseVector[Double], Double, Int, Int]](model: M, globalOptMethod: String,
+    DenseVector[Double], Double, Double, Int, Int]](model: M, globalOptMethod: String,
                                             kernel: String, prototypes: Int, grid: Int,
                                             step: Double, logscale: Boolean = true,
                                             csaIt: Int = 5) = {
     val gs = globalOptMethod match {
-      case "gs" => new GridSearch[G, H, model.type](model).setGridSize(grid)
+      case "gs" => new GridSearch[G, H, Double, model.type](model).setGridSize(grid)
         .setStepSize(step).setLogScale(logscale)
 
-      case "csa" => new CoupledSimulatedAnnealing[G, H, model.type](model).setGridSize(grid)
+      case "csa" => new CoupledSimulatedAnnealing[G, H, Double, model.type](model).setGridSize(grid)
         .setStepSize(step).setLogScale(logscale).setMaxIterations(csaIt)
     }
 

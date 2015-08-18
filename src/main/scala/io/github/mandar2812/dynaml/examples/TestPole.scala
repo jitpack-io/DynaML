@@ -34,7 +34,7 @@ object TestPole {
 
     conf.registerKryoClasses(Array(classOf[LSSVMSparkModel], classOf[KernelSparkModel],
       classOf[KernelizedModel[RDD[(Long, LabeledPoint)], RDD[LabeledPoint],
-        DenseVector[Double], DenseVector[Double], Double, Int, Int]],
+        DenseVector[Double], DenseVector[Double], Double, Double, Int, Int]],
       classOf[SVMKernel[DenseMatrix[Double]]], classOf[RBFKernel],
       classOf[DenseVector[Double]],
       classOf[DenseMatrix[Double]]))

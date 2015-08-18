@@ -58,7 +58,7 @@ object TestMagicGamma {
     }
 
     val (optModel, optConfig) = KernelizedModel.getOptimizedModel[RDD[(Long, LabeledPoint)],
-      RDD[LabeledPoint], Double, model.type](model, globalOptMethod,
+      RDD[LabeledPoint], model.type](model, globalOptMethod,
         kernel, nProt, grid, step, logscale)
 
     optModel.setMaxIterations(2).learn()
