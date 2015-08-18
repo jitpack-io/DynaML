@@ -7,7 +7,7 @@ import com.tinkerpop.blueprints.Graph
 import com.tinkerpop.frames.FramedGraph
 import io.github.mandar2812.dynaml.graphutils.CausalEdge
 import io.github.mandar2812.dynaml.models.KernelizedModel
-import io.github.mandar2812.dynaml.models.svm.LSSVMModel
+import io.github.mandar2812.dynaml.models.svm.{SDLSSVMModel}
 
 /**
  * @author mandar2812
@@ -25,7 +25,7 @@ object TestRipley {
       "delim" -> ",",
       "head" -> "false")
 
-    val model = LSSVMModel(config)
+    val model = SDLSSVMModel(config)
 
     val nProt = if (kernel == "Linear") {
       model.npoints.toInt

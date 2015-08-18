@@ -230,6 +230,10 @@ Q <: Tensor[K2, Double], R, U, K1, K2](protected val task: String)
         case "Polynomial" => new PolynomialKernel().setHyperParameters(h)
         case "Exponential" => new ExponentialKernel().setHyperParameters(h)
         case "Laplacian" => new LaplacianKernel().setHyperParameters(h)
+        case "Cauchy" => new CauchyKernel().setHyperParameters(h)
+        case "RationalQuadratic" => new RationalQuadraticKernel().setHyperParameters(h)
+        case "Wave" => new WaveKernel().setHyperParameters(h)
+        case "Linear" => new LinearKernel().setHyperParameters(h)
       }
       //check if h and this.current_state have the same kernel params
       //calculate kernParam(h)
@@ -290,7 +294,8 @@ object KernelizedModel {
       case "Wave" => gs.optimize(Map("theta" -> 1.0, "RegParam" -> 0.5),
         Map("kernel" -> "Wave", "subset" -> prototypes.toString))
 
-      case "Linear" => gs.optimize(Map("RegParam" -> 0.5))
+      case "Linear" => gs.optimize(Map("RegParam" -> 0.5, "offset" -> 1.0),
+        Map("kernel" -> "Linear", "subset" -> prototypes.toString))
     }
   }
 }

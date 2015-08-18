@@ -1,7 +1,7 @@
 package io.github.mandar2812.dynaml.models.svm
 
 import breeze.linalg._
-import breeze.numerics.{sqrt, sigmoid}
+import breeze.numerics.sigmoid
 import com.github.tototoshi.csv.CSVReader
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLWriter
 import com.tinkerpop.blueprints.util.io.graphson.GraphSONWriter
@@ -9,13 +9,9 @@ import com.tinkerpop.blueprints.{Graph, GraphFactory}
 import com.tinkerpop.frames.{FramedGraph, FramedGraphFactory}
 import io.github.mandar2812.dynaml.evaluation.Metrics
 import io.github.mandar2812.dynaml.graphutils.{CausalEdge, Label, ParamEdge, Parameter, _}
-import io.github.mandar2812.dynaml.kernels.SVMKernel
 import io.github.mandar2812.dynaml.optimization._
 import io.github.mandar2812.dynaml.utils
 import org.apache.log4j.{Logger, Priority}
-import org.apache.spark.mllib.regression.LabeledPoint
-import org.apache.spark.rdd.RDD
-
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 
