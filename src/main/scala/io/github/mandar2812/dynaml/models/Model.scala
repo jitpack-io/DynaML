@@ -205,7 +205,7 @@ Q <: Tensor[K2, Double], R, U, K1, K2](protected val task: String)
 
   def evaluateFold(params: T)
                   (test_data_set: L)
-                  (task: String): Metrics[U, R]
+                  (task: String): Metrics[Double, Double]
 
   def applyFeatureMap: Unit
 
@@ -230,9 +230,6 @@ Q <: Tensor[K2, Double], R, U, K1, K2](protected val task: String)
         case "Polynomial" => new PolynomialKernel().setHyperParameters(h)
         case "Exponential" => new ExponentialKernel().setHyperParameters(h)
         case "Laplacian" => new LaplacianKernel().setHyperParameters(h)
-        case "Cauchy" => new CauchyKernel().setHyperParameters(h)
-        case "RationalQuadratic" => new RationalQuadraticKernel().setHyperParameters(h)
-        case "Wave" => new WaveKernel().setHyperParameters(h)
       }
       //check if h and this.current_state have the same kernel params
       //calculate kernParam(h)

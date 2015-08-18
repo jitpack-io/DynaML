@@ -44,7 +44,7 @@ class SSDLSSVMModel(override protected val g: FramedGraph[Graph],
     var index: Int = 1
     val prototypes = this.filterFeatures(p => this.points.contains(p))
     val scorepred: (DenseVector[Double]) => Double =
-      x => params dot DenseVector(prototypes.map(p => this.kernel.evaluate(p, x)), Array(1.0))
+      x => params dot DenseVector(prototypes.map(p => this.kernel.evaluate(p, x)).toArray :+ 1.0)
 
     val scoresAndLabels = test_data_set.map((e) => {
 
@@ -61,9 +61,15 @@ class SSDLSSVMModel(override protected val g: FramedGraph[Graph],
     //Create the folds as lists of integers
     //which index the data points
 
-    (feature_a, b) = SSDLSSVMModel.getFeatureMatrix(points.length.toLong, kernel,
-      this.filterXYEdges((p) => this.points.contains(p)), this.initParams(),
-      1.0, reg)
+
+    if(optionalStateFlag || feature_a == null) {
+      val featuremats = SSDLSSVMModel.getFeatureMatrix(points.length.toLong, kernel,
+        this.filterXYEdges((p) => this.points.contains(p)), this.initParams(),
+        1.0, reg)
+
+      feature_a = featuremats._1
+      b = featuremats._2
+    }
 
     this.optimizer.setRegParam(reg).setNumIterations(this.params.length)
       .setStepSize(0.001).setMiniBatchFraction(1.0)
@@ -84,7 +90,8 @@ object SSDLSSVMModel {
                        kernel: SVMKernel[DenseMatrix[Double]],
                        ParamOutEdges: Iterable[CausalEdge],
                        initialP: DenseVector[Double],
-                       frac: Double, regParam: Double) = {
+                       frac: Double, regParam: Double)
+  : (DenseMatrix[Double], DenseVector[Double]) = {
 
     val kernelmat = kernel.buildKernelMatrix(
       ParamOutEdges.map(p =>
@@ -94,17 +101,17 @@ object SSDLSSVMModel {
     val smoother = DenseMatrix.eye[Double](nPoints.toInt)/regParam
 
     val ones = DenseMatrix.fill[Double](1,nPoints.toInt)(1.0)
-    val y = DenseVector(ParamOutEdges.map(p => p.getLabel().getValue()))
+    val y: DenseVector[Double] = DenseVector(ParamOutEdges.map(p => p.getLabel().getValue()).toArray)
     /**
      * A = [K + I/reg]|[1]
      *     [1.t]      |[0]
      * */
     val A = DenseMatrix.horzcat(
       DenseMatrix.vertcat(kernelmat + smoother, ones),
-      DenseMatrix.vertcat(ones.t, DenseMatrix(0))
+      DenseMatrix.vertcat(ones.t, DenseMatrix(0.0))
     )
 
-    val b = DenseVector.vertcat(y, DenseVector(0))
+    val b = DenseVector.vertcat(y, DenseVector(0.0))
     (A,b)
   }
 
