@@ -6,17 +6,17 @@ import org.apache.spark.rdd.RDD
 /**
  * Abstract trait for metrics
  */
-trait Metrics[P] {
-  protected val scoresAndLabels: List[(P, P)]
+trait Metrics[Q, P] {
+  protected val scoresAndLabels: List[(Q, P)]
   def print(): Unit
   def generatePlots(): Unit = {}
-  def kpi(): DenseVector[P]
+  def kpi(): DenseVector[Double]
 }
 
 object Metrics{
   def apply(task: String)
            (scoresAndLabels: List[(Double, Double)], length: Int)
-  : Metrics[Double] = task match {
+  : Metrics[Double, Double] = task match {
     case "regression" => new RegressionMetrics(scoresAndLabels, length)
     case "classification" => new BinaryClassificationMetrics(scoresAndLabels, length)
   }
@@ -27,7 +27,7 @@ object MetricsSpark {
            (scoresAndLabels: RDD[(Double, Double)],
             length: Long,
             minmax: (Double, Double))
-  : Metrics[Double] = task match {
+  : Metrics[Double, Double] = task match {
     case "regression" => new RegressionMetricsSpark(scoresAndLabels, length)
     case "classification" => new BinaryClassificationMetricsSpark(scoresAndLabels, length, minmax)
   }

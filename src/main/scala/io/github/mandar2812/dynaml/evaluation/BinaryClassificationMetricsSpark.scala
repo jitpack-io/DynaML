@@ -16,23 +16,22 @@ import scalax.chart.module.ChartFactories.{XYAreaChart, XYLineChart}
 class BinaryClassificationMetricsSpark(
   protected val scores: RDD[(Double, Double)],
   val len: Long, minmax: (Double, Double))
-  extends Metrics[Double]{
+  extends Metrics[Double, Double]{
 
   override protected val scoresAndLabels = List()
 
   private val logger = Logger.getLogger(this.getClass)
   val length = len
 
+  private val (scMin, scMax) = minmax
+
   /**
    * A list of threshold values from
-   * -1.0 to 1.0 in 100 steps. These
+   * min score to 1.0 in max score steps. These
    * will be used to measure the variation
    * in precision, recall False Positive
    * and False Negative values.
    * */
-
-  private val (scMin, scMax) = minmax
-
   private val thresholds = List.tabulate(100)(i => {
     scMin +
       i.toDouble*((scMax.toInt -
@@ -45,8 +44,7 @@ class BinaryClassificationMetricsSpark(
   def scores_and_labels = this.scoresAndLabels
 
   private def areaUnderCurve(points: List[(Double, Double)]): Double =
-    points.sliding(2)
-      .map(l => (l(1)._1 - l.head._1) * (l(1)._2 + l.head._2)/2).sum
+    BinaryClassificationMetrics.areaUnderCurve(points)
 
 
   /**
@@ -127,22 +125,25 @@ class BinaryClassificationMetricsSpark(
     val negatives = scores.context.accumulator(0.0, "negatives")
     val ths = scores.context.broadcast(thresholds.length)
     val thres = scores.context.broadcast(thresholds)
-    val (tp, fp) = this.scores.map((sl) =>{
+    val (tp, fp) = this.scores.mapPartitions((scoresAndLabels) =>{
+      Seq(scoresAndLabels.map((sl) => {
+        val (tpv, fpv): (DenseVector[Double], DenseVector[Double]) =
+          if(sl._2 == 1.0) {
+            positives += 1.0
+            (DenseVector.tabulate(ths.value)(i => {
+              if(math.signum(sl._1 - thres.value(i)) == sl._2) 1.0 else 0.0
+            }), DenseVector.zeros(ths.value))
 
-      val (tpv, fpv): (DenseVector[Double], DenseVector[Double]) =
-        if(sl._2 == 1.0) {
-          positives += 1.0
-          (DenseVector.tabulate(ths.value)(i => {
-            if(math.signum(sl._1 - thres.value(i)) == sl._2) 1.0 else 0.0
-          }), DenseVector.zeros(ths.value))
-
-        } else {
-          negatives += 1.0
-          (DenseVector.zeros(ths.value), DenseVector.tabulate(ths.value)(i => {
-            if(math.signum(sl._1 - thres.value(i)) == 1.0) 1.0 else 0.0
-          }))
-        }
-      (tpv,fpv)
+          } else {
+            negatives += 1.0
+            (DenseVector.zeros(ths.value), DenseVector.tabulate(ths.value)(i => {
+              if(math.signum(sl._1 - thres.value(i)) == 1.0) 1.0 else 0.0
+            }))
+          }
+        (tpv,fpv)
+      }).reduce((c1, c2) => {
+        (c1._1+c2._1, c1._2+c2._2)
+      })).toIterator
     }).reduce((c1, c2) => {
       (c1._1+c2._1, c1._2+c2._2)
     })

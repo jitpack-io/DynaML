@@ -4,62 +4,33 @@ import java.io.File
 
 import breeze.linalg.{DenseMatrix, DenseVector}
 import com.github.tototoshi.csv.CSVWriter
-import org.apache.spark.mllib.regression.LabeledPoint
-import org.apache.spark.rdd.RDD
-import org.apache.spark.{SparkConf, SparkContext}
 import io.github.mandar2812.dynaml.kernels.{RBFKernel, SVMKernel}
 import io.github.mandar2812.dynaml.models.KernelizedModel
 import io.github.mandar2812.dynaml.models.svm.{KernelSparkModel, LSSVMSparkModel}
+import org.apache.spark.{SparkContext, SparkConf}
+import org.apache.spark.mllib.regression.LabeledPoint
+import org.apache.spark.rdd.RDD
 
 /**
- * @author mandar2812 on 1/7/15.
+ * @author mandar2812 on 22/6/15.
  */
-object TestForestCover {
 
-  def main(args: Array[String]) = {
-
-    val prot = args(0).toInt
-    val kern = args(1)
-    val go = args(2)
-    val grid = args(3).toInt
-    val step = args(4).toDouble
-    val root = args(5)
-    val ex = args(6).toInt
-    val cores = args(7).toInt
-    val ans = TestForestCover(cores, prot, kern, go,
-      grid, step, false, 1.0,
-      dataRoot = root, executors = ex,
-      local = false)
-  }
-
+object TestDelve {
   def apply(nCores: Int = 4, prototypes: Int = 1, kernel: String,
             globalOptMethod: String = "gs", grid: Int = 7,
-            step: Double = 0.45, logscale: Boolean = false, frac: Double,
-            dataRoot: String = "data/", executors: Int = 1,
-            local: Boolean = false, paraFactor: Int = 2): DenseVector[Double] = {
-
-    val trainfile = dataRoot+"cover.csv"
-    val testfile = dataRoot+"covertest.csv"
-
-    val config = Map(
-      "file" -> trainfile,
-      "delim" -> ",",
+            step: Double = 0.45, logscale: Boolean = false,
+            frac: Double, executors: Int = 1,
+            paraFactor: Int = 2, csaIt: Int = 5): DenseVector[Double] = {
+    val config = Map("file" -> "data/fried_delve.data", "delim" -> ",",
       "head" -> "false",
-      "task" -> "classification",
-      "parallelism" -> nCores.toString,
-      "executors" -> executors.toString,
-      "factor" -> paraFactor.toString
-    )
+      "task" -> "regression")
 
-    val configtest = Map("file" -> testfile,
+    val configtest = Map("file" -> "data/fried_delve_test.data",
       "delim" -> ",",
       "head" -> "false")
 
-    val conf = new SparkConf().setAppName("Forest Cover")
 
-    if(local) {
-      conf.setMaster("local["+nCores.toString+"]")
-    }
+    val conf = new SparkConf().setAppName("Fried Delve Synthetic Data").setMaster("local["+nCores+"]")
 
     conf.registerKryoClasses(Array(classOf[LSSVMSparkModel], classOf[KernelSparkModel],
       classOf[KernelizedModel[RDD[(Long, LabeledPoint)], RDD[LabeledPoint],
@@ -81,15 +52,13 @@ object TestForestCover {
         math.sqrt(model.npoints.toDouble).toInt
     }
 
-    model.setBatchFraction(frac)
     val (optModel, optConfig) = KernelizedModel.getOptimizedModel[RDD[(Long, LabeledPoint)],
       RDD[LabeledPoint], model.type](model, globalOptMethod,
-        kernel, nProt, grid, step, logscale)
+        kernel, nProt, grid, step, logscale, csaIt)
 
-    optModel.setMaxIterations(35).learn()
+    optModel.learn()
 
     val met = optModel.evaluate(configtest)
-
 
     met.print()
     println("Optimal Configuration: "+optConfig)
@@ -100,10 +69,11 @@ object TestForestCover {
       grid.toString, step.toString, scale,
       perf(0), perf(1), perf(2), optConfig.toString)
 
-    val writer = CSVWriter.open(new File("resultsForestCover.csv"), append = true)
+    val writer = CSVWriter.open(new File("data/resultsDelve.csv"), append = true)
     writer.writeRow(row)
     writer.close()
     optModel.unpersist
     perf
   }
 }
+

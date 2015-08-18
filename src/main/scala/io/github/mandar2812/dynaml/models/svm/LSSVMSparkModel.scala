@@ -3,7 +3,7 @@ package io.github.mandar2812.dynaml.models.svm
 import breeze.linalg.{DenseMatrix, DenseVector}
 import breeze.numerics.sqrt
 import io.github.mandar2812.dynaml.utils.MinMaxAccumulator
-import org.apache.spark.SparkContext
+import org.apache.spark.{Accumulator, SparkContext}
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
@@ -23,6 +23,8 @@ class LSSVMSparkModel(data: RDD[LabeledPoint], task: String)
   override protected val optimizer = LSSVMSparkModel.getOptimizer(task)
 
   override protected var params: DenseVector[Double] = DenseVector.ones(featuredims+1)
+
+  private var featureMatricesCache: (DenseMatrix[Double], DenseVector[Double]) = (null, null)
 
   def dimensions = featuredims
 
@@ -126,9 +128,9 @@ class LSSVMSparkModel(data: RDD[LabeledPoint], task: String)
 
   override def evaluateFold(params: DenseVector[Double])
                            (test_data_set: RDD[LabeledPoint])
-                           (task: String): Metrics[Double] = {
+                           (task: String): Metrics[Double, Double] = {
     val sc = test_data_set.context
-    var index: Int = 1
+    var index: Accumulator[Long] = sc.accumulator(1)
 
     val paramsb = sc.broadcast(params)
     val minmaxacc = sc.accumulator(DenseVector(Double.MaxValue, Double.MinValue),
@@ -140,18 +142,33 @@ class LSSVMSparkModel(data: RDD[LabeledPoint], task: String)
       (sco, e.label)
     })
     val minmax = minmaxacc.value
-    MetricsSpark(task)(scoresAndLabels, index, (minmax(0), minmax(1)))
+    MetricsSpark(task)(scoresAndLabels, index.value, (minmax(0), minmax(1)))
   }
 
-  override def crossvalidate(folds: Int, reg: Double): (Double, Double, Double) = {
+  override def crossvalidate(folds: Int, reg: Double,
+                             optionalStateFlag: Boolean = false): (Double, Double, Double) = {
     //Create the folds as lists of integers
     //which index the data points
-    this.optimizer.setRegParam(reg).setNumIterations(2)
-      .setStepSize(0.001).setMiniBatchFraction(1.0)
+    /*this.optimizer.setRegParam(reg).setNumIterations(2)
+      .setStepSize(0.001).setMiniBatchFraction(1.0)*/
     val shuffle = Random.shuffle((1L to this.npoints).toList)
 
-    val (featureMatrix,b) = LSSVMSparkModel.getFeatureMatrix(npoints, processed_g.map(_._2),
-      this.initParams(), 1.0, reg)
+    if(!optionalStateFlag || featureMatricesCache == (null, null)) {
+      featureMatricesCache = LSSVMSparkModel.getFeatureMatrix(npoints, processed_g.map(_._2),
+        this.initParams(), 1.0, reg)
+
+      val smoother:DenseMatrix[Double] = DenseMatrix.eye[Double](effectivedims)/reg
+      smoother(-1,-1) = 0.0
+      featureMatricesCache._1 :+= smoother
+    } else {
+      val smoother_old:DenseMatrix[Double] = DenseMatrix.eye[Double](effectivedims)/current_state("RegParam")
+      smoother_old(-1,-1) = 0.0
+      val smoother_new:DenseMatrix[Double] = DenseMatrix.eye[Double](effectivedims)/reg
+      smoother_new(-1,-1) = 0.0
+
+      featureMatricesCache._1 :-= smoother_old
+      featureMatricesCache._1 :+= smoother_new
+    }
 
     val avg_metrics: DenseVector[Double] = (1 to folds).map{a =>
       //For the ath fold
@@ -167,8 +184,8 @@ class LSSVMSparkModel(data: RDD[LabeledPoint], task: String)
         this.initParams(),
         1.0, reg)
 
-      val featureMatrix_a = featureMatrix - a_folda
-      val bias = b - b_folda
+      val featureMatrix_a = featureMatricesCache._1 - a_folda
+      val bias = featureMatricesCache._2 - b_folda
       val tempparams = ConjugateGradientSpark.runCG(featureMatrix_a,
         bias, this.initParams(), 0.001, 35)
       val metrics = this.evaluateFold(tempparams)(test_data)(this.task)
@@ -194,10 +211,11 @@ object LSSVMSparkModel {
     Vectors.dense(ans.toArray)
   }
 
-  def apply(implicit config: Map[String, String], sc: SparkContext): LSSVMSparkModel = {
+  def generateRDD(implicit config: Map[String, String], sc: SparkContext): (RDD[LabeledPoint], String) = {
     val (file, delim, head, task) = LSSVMModel.readConfig(config)
     val minPartitions = if(config.contains("parallelism") &&
-      config.contains("executors")) 2*config("parallelism").toInt * config("executors").toInt
+      config.contains("executors") && config.contains("factor"))
+      config("factor").toInt * config("parallelism").toInt * config("executors").toInt
     else 2
 
     val csv = sc.textFile(file, minPartitions).map(line => line split delim)
@@ -213,7 +231,11 @@ object LSSVMSparkModel {
       case false =>
         csv
     }
+    (data, task)
+  }
 
+  def apply(implicit config: Map[String, String], sc: SparkContext): LSSVMSparkModel = {
+    val (data, task) = generateRDD(config, sc)
     new LSSVMSparkModel(data, task)
   }
 
@@ -279,17 +301,21 @@ object LSSVMSparkModel {
     val (a,b): (DenseMatrix[Double], DenseVector[Double]) =
       ParamOutEdges.filter((_) => Random.nextDouble() <= frac)
         .mapPartitions((edges) => {
-        edges.map((edge) => {
+        Seq(edges.map((edge) => {
           val phi = DenseVector(edge.features.toArray)
           val label = edge.label
           val phiY: DenseVector[Double] = phi * label
           (phi*phi.t, phiY)
-        })
+        }).reduce((couple1, couple2) => {
+          (couple1._1+couple2._1, couple1._2+couple2._2)
+        })).toIterator
       }).reduce((couple1, couple2) => {
         (couple1._1+couple2._1, couple1._2+couple2._2)
       })
-    a + (DenseMatrix.eye[Double](dims)*regParam)
+
     (a,b)
   }
+
+
 
 }

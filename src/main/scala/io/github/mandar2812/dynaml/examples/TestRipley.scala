@@ -7,7 +7,7 @@ import com.tinkerpop.blueprints.Graph
 import com.tinkerpop.frames.FramedGraph
 import io.github.mandar2812.dynaml.graphutils.CausalEdge
 import io.github.mandar2812.dynaml.models.KernelizedModel
-import io.github.mandar2812.dynaml.models.svm.LSSVMModel
+import io.github.mandar2812.dynaml.models.svm.{SDLSSVMModel}
 
 /**
  * @author mandar2812
@@ -15,7 +15,8 @@ import io.github.mandar2812.dynaml.models.svm.LSSVMModel
 object TestRipley {
   def apply(prototypes: Int = 1, kernel: String,
             globalOptMethod: String = "gs", grid: Int = 7,
-            step: Double = 0.3, logscale: Boolean = false): Unit = {
+            step: Double = 0.3, logscale: Boolean = false,
+            csaIt: Int = 5): Unit = {
     val config = Map("file" -> "data/ripley.csv", "delim" -> ",",
       "head" -> "false",
       "task" -> "classification")
@@ -24,7 +25,7 @@ object TestRipley {
       "delim" -> ",",
       "head" -> "false")
 
-    val model = LSSVMModel(config)
+    val model = SDLSSVMModel(config)
 
     val nProt = if (kernel == "Linear") {
       model.npoints.toInt
@@ -37,7 +38,7 @@ object TestRipley {
 
     val (optModel, optConfig) = KernelizedModel.getOptimizedModel[FramedGraph[Graph],
       Iterable[CausalEdge], model.type](model, globalOptMethod,
-      kernel, nProt, grid, step, logscale)
+      kernel, nProt, grid, step, logscale, csaIt)
 
     optModel.setMaxIterations(2).learn()
 

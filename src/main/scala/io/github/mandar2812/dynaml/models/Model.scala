@@ -89,9 +89,9 @@ trait ParameterizedLearner[G, K, T, Q <: Tensor[K, Double], R, S]
  * */
 
 abstract class LinearModel[T, K1, K2,
-  P <: Tensor[K1, Double], Q <: Tensor[K2, Double], R, S]
+  P <: Tensor[K1, Double], Q <: Tensor[K2, Double], R, U, S]
   extends ParameterizedLearner[T, K2, P, Q, R, S]
-  with EvaluableModel[P, R] {
+  with EvaluableModel[P, U, R] {
 
   /**
    * Predict the value of the
@@ -114,13 +114,17 @@ abstract class LinearModel[T, K1, K2,
  * @tparam P The type of the model's Parameters
  * @tparam R The type of the output value
  * */
-trait EvaluableModel [P, R]{
-  def evaluate(config: Map[String, String]): Metrics[R]
+trait EvaluableModel [P, Q, R]{
+  def evaluate(config: Map[String, String]): Metrics[Q, R]
 }
 
 abstract class KernelizedModel[G, L, T <: Tensor[K1, Double],
-Q <: Tensor[K2, Double], R, K1, K2](protected val task: String)
-  extends LinearModel[G, K1, K2, T, Q, R, L] with GloballyOptimizable {
+Q <: Tensor[K2, Double], R, U, K1, K2](protected val task: String)
+  extends LinearModel[G, K1, K2, T, Q, R, U, L] with GloballyOptimizable {
+
+  override protected var hyper_parameters: List[String] = List("RegParam")
+
+  override protected var current_state: Map[String, Double] = Map("RegParam" -> 1.0)
 
   protected val nPoints: Long
 
@@ -170,7 +174,8 @@ Q <: Tensor[K2, Double], R, K1, K2](protected val task: String)
 
   def trainTest(test: List[Long]): (L,L)
 
-  def crossvalidate(folds: Int, reg: Double): (Double, Double, Double) = {
+  def crossvalidate(folds: Int, reg: Double,
+                    optionalStateFlag: Boolean = false): (Double, Double, Double) = {
     //Create the folds as lists of integers
     //which index the data points
     this.optimizer.setRegParam(reg).setNumIterations(40)
@@ -186,7 +191,8 @@ Q <: Tensor[K2, Double], R, K1, K2](protected val task: String)
       val test = shuffle.slice((a-1)*this.nPoints.toInt/folds, a*this.nPoints.toInt/folds)
       val(training_data, test_data) = this.trainTest(test)
 
-      val tempparams = this.optimizer.optimize((folds - 1 / folds) * this.npoints, training_data, this.initParams())
+      val tempparams = this.optimizer.optimize((folds - 1 / folds) * this.npoints,
+        training_data, this.initParams())
       val metrics = this.evaluateFold(tempparams)(test_data)(this.task)
       val res: DenseVector[Double] = metrics.kpi() / folds.toDouble
       res
@@ -199,7 +205,7 @@ Q <: Tensor[K2, Double], R, K1, K2](protected val task: String)
 
   def evaluateFold(params: T)
                   (test_data_set: L)
-                  (task: String): Metrics[Double]
+                  (task: String): Metrics[Double, Double]
 
   def applyFeatureMap: Unit
 
@@ -217,13 +223,17 @@ Q <: Tensor[K2, Double], R, K1, K2](protected val task: String)
   override def energy(h: Map[String, Double], options: Map[String, String]): Double = {
     //set the kernel paramters if options is defined
     //then set model parameters and cross validate
-
+    var kernelflag = true
     if(options.contains("kernel")) {
       val kern = options("kernel") match {
         case "RBF" => new RBFKernel().setHyperParameters(h)
         case "Polynomial" => new PolynomialKernel().setHyperParameters(h)
         case "Exponential" => new ExponentialKernel().setHyperParameters(h)
         case "Laplacian" => new LaplacianKernel().setHyperParameters(h)
+        case "Cauchy" => new CauchyKernel().setHyperParameters(h)
+        case "RationalQuadratic" => new RationalQuadraticKernel().setHyperParameters(h)
+        case "Wave" => new WaveKernel().setHyperParameters(h)
+        case "Linear" => new LinearKernel().setHyperParameters(h)
       }
       //check if h and this.current_state have the same kernel params
       //calculate kernParam(h)
@@ -236,28 +246,30 @@ Q <: Tensor[K2, Double], R, K1, K2](protected val task: String)
       val kerncs = current_state.filter((couple) => kern.hyper_parameters.contains(couple._1))
       if(!(kernh sameElements kerncs)) {
         this.applyKernel(kern, nprototypes)
+        kernelflag = false
       }
     }
     this.applyFeatureMap
-    current_state = h
-    val (_,_,e) = this.crossvalidate(4, h("RegParam"))
 
-    1.0-e
+    val (_,_,e) = this.crossvalidate(4, h("RegParam"), optionalStateFlag = kernelflag)
+    current_state = h
+    1.0-e.asInstanceOf[Double]
   }
 
 }
 
 object KernelizedModel {
   def getOptimizedModel[G, H, M <: KernelizedModel[G, H, DenseVector[Double],
-    DenseVector[Double], Double, Int, Int]](model: M, globalOptMethod: String,
+    DenseVector[Double], Double, Double, Int, Int]](model: M, globalOptMethod: String,
                                             kernel: String, prototypes: Int, grid: Int,
-                                            step: Double, logscale: Boolean = true) = {
+                                            step: Double, logscale: Boolean = true,
+                                            csaIt: Int = 5) = {
     val gs = globalOptMethod match {
-      case "gs" => new GridSearch[G, H, model.type](model).setGridSize(grid)
+      case "gs" => new GridSearch[G, H, Double, model.type](model).setGridSize(grid)
         .setStepSize(step).setLogScale(logscale)
 
-      case "csa" => new CoupledSimulatedAnnealing[G, H, model.type](model).setGridSize(grid)
-        .setStepSize(step).setLogScale(logscale).setMaxIterations(5)
+      case "csa" => new CoupledSimulatedAnnealing[G, H, Double, model.type](model).setGridSize(grid)
+        .setStepSize(step).setLogScale(logscale).setMaxIterations(csaIt)
     }
 
     kernel match {
@@ -273,7 +285,17 @@ object KernelizedModel {
       case "Laplacian" => gs.optimize(Map("beta" -> 1.0, "RegParam" -> 0.5),
         Map("kernel" -> "Laplacian", "subset" -> prototypes.toString))
 
-      case "Linear" => gs.optimize(Map("RegParam" -> 0.5))
+      case "Cauchy" => gs.optimize(Map("sigma" -> 1.0, "RegParam" -> 0.5),
+        Map("kernel" -> "Cauchy", "subset" -> prototypes.toString))
+
+      case "RationalQuadratic" => gs.optimize(Map("c" -> 1.0, "RegParam" -> 0.5),
+        Map("kernel" -> "RationalQuadratic", "subset" -> prototypes.toString))
+
+      case "Wave" => gs.optimize(Map("theta" -> 1.0, "RegParam" -> 0.5),
+        Map("kernel" -> "Wave", "subset" -> prototypes.toString))
+
+      case "Linear" => gs.optimize(Map("RegParam" -> 0.5, "offset" -> 1.0),
+        Map("kernel" -> "Linear", "subset" -> prototypes.toString))
     }
   }
 }

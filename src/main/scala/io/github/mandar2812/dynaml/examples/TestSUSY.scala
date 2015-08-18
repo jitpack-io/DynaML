@@ -25,25 +25,27 @@ object TestSUSY {
     val dataRoot = args(5)
     val ex = args(6).toInt
     val cores = args(7).toInt
-    TestSUSY(cores, prot, kern, go,
+    val ans = TestSUSY(cores, prot, kern, go,
       grid, step, false, 1.0, dataRoot,
       ex)
   }
 
   def apply(nCores: Int = 4, prototypes: Int = 1, kernel: String,
             globalOptMethod: String = "gs", grid: Int = 7,
-            step: Double = 0.3, logscale: Boolean = false, frac: Double,
-            root: String, executors: Int = 1, local: Boolean = false): Unit = {
+            step: Double = 0.45, logscale: Boolean = false, 
+            frac: Double, dataRoot: String, executors: Int = 1,
+            local: Boolean = false, paraFactor: Int = 2): DenseVector[Double] = {
 
-    val trainFile = root+"susy.csv"
-    val testFile = root+"susytest.csv"
+    val trainFile = dataRoot+"susy.csv"
+    val testFile = dataRoot+"susytest.csv"
     val config = Map(
       "file" -> trainFile,
       "delim" -> ",",
       "head" -> "false",
       "task" -> "classification",
       "parallelism" -> nCores.toString,
-      "executors" -> executors.toString
+      "executors" -> executors.toString,
+      "factor" -> paraFactor.toString
     )
 
     val configtest = Map("file" -> testFile,
@@ -58,7 +60,7 @@ object TestSUSY {
 
     conf.registerKryoClasses(Array(classOf[LSSVMSparkModel], classOf[KernelSparkModel],
       classOf[KernelizedModel[RDD[(Long, LabeledPoint)], RDD[LabeledPoint],
-        DenseVector[Double], DenseVector[Double], Double, Int, Int]],
+        DenseVector[Double], DenseVector[Double], Double, Double, Int, Int]],
       classOf[SVMKernel[DenseMatrix[Double]]], classOf[RBFKernel],
       classOf[DenseVector[Double]],
       classOf[DenseMatrix[Double]]))
@@ -94,10 +96,10 @@ object TestSUSY {
       grid.toString, step.toString, scale,
       perf(0), perf(1), perf(2), optConfig.toString)
 
-    val writer = CSVWriter.open(new File(root+"resultsSUSY.csv"), append = true)
+    val writer = CSVWriter.open(new File(dataRoot+"resultsSUSY.csv"), append = true)
     writer.writeRow(row)
     writer.close()
     optModel.unpersist
-
+    perf
   }
 }

@@ -37,9 +37,15 @@ import scala.util.Random
  */
 abstract class KernelLSSVMModel(implicit override protected val task: String) extends
 KernelizedModel[FramedGraph[Graph], Iterable[CausalEdge],
-  DenseVector[Double], DenseVector[Double], Double, Int, Int](task) {
+  DenseVector[Double], DenseVector[Double], Double, Double, Int, Int](task) {
 
   protected val logger = Logger.getLogger(this.getClass)
+
+  protected val (mean, variance) = utils.getStatsMult(this.filter(_ => true))
+
+  protected val (label_mean, label_var) = utils.getStatsMult(this.filterLabels(_ => true).map(i => DenseVector(i)))
+
+  protected var (phi_mean, phi_var) = (mean, variance)
 
   override protected val optimizer: ConjugateGradient
 
@@ -49,10 +55,6 @@ KernelizedModel[FramedGraph[Graph], Iterable[CausalEdge],
   }
 
   def getRegParam: Double
-
-  override protected var hyper_parameters: List[String] = List("RegParam")
-
-  override protected var current_state: Map[String, Double] = Map("RegParam" -> 1.0)
 
   protected val featuredims: Int
 
@@ -72,6 +74,14 @@ KernelizedModel[FramedGraph[Graph], Iterable[CausalEdge],
       this.g.getEdges("relation", "causal", classOf[CausalEdge])
     )
 
+  def filterXYEdges(fn : (Long) => Boolean) = (1L to nPoints).view.filter(fn).map{
+    i => {
+      this.g.getEdge(edgeMaps._1(i),
+        classOf[CausalEdge])
+
+    }
+  }
+
   /**
    * Get a subset of the data set defined
    * as a filter operation on the raw data set.
@@ -87,6 +97,15 @@ KernelizedModel[FramedGraph[Graph], Iterable[CausalEdge],
         val point: Point = this.g.getVertex(vertexMaps._2(i),
           classOf[Point])
         DenseVector(point.getValue())(0 to -2)
+      }
+    }.toList
+
+  def filterFeatures(fn : (Long) => Boolean): List[DenseVector[Double]] =
+    (1L to nPoints).view.filter(fn).map{
+      i => {
+        val point: Point = this.g.getVertex(vertexMaps._2(i),
+          classOf[Point])
+        DenseVector(point.getFeatureMap())(0 to -2)
       }
     }.toList
 
@@ -204,10 +223,11 @@ KernelizedModel[FramedGraph[Graph], Iterable[CausalEdge],
     (training_data, test_data)
   }
 
-  override def crossvalidate(folds: Int = 10, reg: Double = 0.001): (Double, Double, Double) = {
+  override def crossvalidate(folds: Int = 10, reg: Double = 0.001,
+                             optionalStateFlag: Boolean = false): (Double, Double, Double) = {
     //Create the folds as lists of integers
     //which index the data points
-    this.optimizer.setRegParam(reg).setNumIterations(1)
+    this.optimizer.setRegParam(reg).setNumIterations(this.params.length)
       .setStepSize(0.001).setMiniBatchFraction(1.0)
     val shuffle = Random.shuffle((1L to this.npoints).toList)
     val avg_metrics: DenseVector[Double] = (1 to folds).map{a =>
@@ -256,7 +276,7 @@ KernelizedModel[FramedGraph[Graph], Iterable[CausalEdge],
     val maximum = grid.max
     logger.log(Priority.INFO, "Best value: "+maximum)
     this.applyKernel(new RBFKernel(maximum._2._1), prot)
-    this.setRegParam(maximum._2._2).setMaxIterations(10).setBatchFraction(1.0)
+    this.setRegParam(maximum._2._2).setMaxIterations(35).setBatchFraction(1.0)
     this.learn()
   }
 

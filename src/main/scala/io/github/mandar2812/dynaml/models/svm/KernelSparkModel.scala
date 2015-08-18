@@ -30,7 +30,7 @@ import scala.util.Random
  */
 abstract class KernelSparkModel(data: RDD[LabeledPoint], task: String)
   extends KernelizedModel[RDD[(Long, LabeledPoint)], RDD[LabeledPoint],
-    DenseVector[Double], DenseVector[Double], Double, Int, Int](task)
+    DenseVector[Double], DenseVector[Double], Double, Double, Int, Int](task)
   with Serializable {
 
   override protected val g = LSSVMSparkModel.indexedRDD(data)
@@ -40,10 +40,6 @@ abstract class KernelSparkModel(data: RDD[LabeledPoint], task: String)
   val colStats = Statistics.colStats(g.map(_._2.features))
 
   override protected val nPoints: Long = colStats.count
-
-  override protected var hyper_parameters: List[String] = List("RegParam")
-
-  override protected var current_state: Map[String, Double] = Map("RegParam" -> 1.0)
 
   protected var featuredims: Int = g.first()._2.features.size
 
