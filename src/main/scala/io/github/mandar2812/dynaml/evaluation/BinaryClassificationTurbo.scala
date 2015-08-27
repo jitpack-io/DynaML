@@ -36,6 +36,8 @@ abstract class BinaryClassificationTurbo(
   def tpfpByThresholds(): List[List[(Double, (Double, Double))]] = {
     val positives = scores.context.accumulator(0.0, "positives")
     val negatives = scores.context.accumulator(0.0, "negatives")
+    val ths = scores.context.broadcast(thresholds.head.length)
+    val thres = scores.context.broadcast(thresholds)
 
     List()
   }
