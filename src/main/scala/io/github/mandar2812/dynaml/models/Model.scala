@@ -1,6 +1,7 @@
 package io.github.mandar2812.dynaml.models
 
 import breeze.linalg._
+import io.github.mandar2812.dynaml.graphutils.CausalEdge
 import io.github.mandar2812.dynaml.kernels.SVMKernel
 import io.github.mandar2812.dynaml.optimization.GloballyOptimizable
 import io.github.mandar2812.dynaml.evaluation.Metrics
@@ -93,6 +94,10 @@ abstract class LinearModel[T, K1, K2,
   extends ParameterizedLearner[T, K2, P, Q, R, S]
   with EvaluableModel[P, U, R] {
 
+  val rescale: (Q) => Q = identity
+
+  def score(point: Q): R
+
   /**
    * Predict the value of the
    * target variable given a
@@ -129,6 +134,8 @@ Q <: Tensor[K2, Double], R, U, K1, K2](protected val task: String)
   protected val nPoints: Long
 
   def npoints = nPoints
+
+  def getPrototypes(): List[Q]
 
   /**
    * This variable stores the indexes of the
@@ -298,4 +305,35 @@ object KernelizedModel {
         Map("kernel" -> "Linear", "subset" -> prototypes.toString))
     }
   }
+}
+
+
+trait SubsampledDualLSSVM[G, L] extends
+KernelizedModel[G, L, DenseVector[Double], DenseVector[Double],
+  Double, Double, Int, Int]{
+
+  var kernel :SVMKernel[DenseMatrix[Double]] = null
+
+  var (feature_a, b): (DenseMatrix[Double], DenseVector[Double]) = (null, null)
+
+  protected var effectivedims:Int
+
+  override def applyKernel(kern: SVMKernel[DenseMatrix[Double]],
+                           M: Int = this.points.length):Unit = {
+    if(M != this.points.length) {
+      this.optimumSubset(M)
+    }
+    this.params = DenseVector.fill(M+1)(1.0)
+    effectivedims = M+1
+    kernel = kern
+  }
+
+  override def applyFeatureMap: Unit = {}
+
+  override def learn(): Unit = {
+    this.params =ConjugateGradient.runCG(feature_a, b,
+      this.initParams(), 0.0001,
+      this.params.length)
+  }
+
 }

@@ -49,9 +49,18 @@ KernelizedModel[FramedGraph[Graph], Iterable[CausalEdge],
 
   override protected val optimizer: ConjugateGradient
 
+  override def getPrototypes() = this.filterFeatures(p => this.points.contains(p))
+
   def setRegParam(reg: Double): this.type = {
     this.optimizer.setRegParam(reg)
     this
+  }
+
+  override def score(point: DenseVector[Double]): Double = {
+    val rescaled = rescale(point)
+    val phi = featureMap(rescaled)
+    val phic = DenseVector.vertcat(phi, DenseVector(1.0))
+    params dot phic
   }
 
   def getRegParam: Double

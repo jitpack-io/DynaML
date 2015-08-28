@@ -6,6 +6,7 @@ import com.tinkerpop.frames.{FramedGraphFactory, FramedGraph}
 import io.github.mandar2812.dynaml.evaluation.Metrics
 import io.github.mandar2812.dynaml.graphutils._
 import io.github.mandar2812.dynaml.kernels.SVMKernel
+import io.github.mandar2812.dynaml.models.SubsampledDualLSSVM
 import io.github.mandar2812.dynaml.optimization.ConjugateGradient
 import io.github.mandar2812.dynaml.utils
 import org.apache.log4j.{Logger, Priority}
@@ -22,52 +23,24 @@ class SDLSSVMModel(override protected val g: FramedGraph[Graph],
                    override protected val edgeMaps: (mutable.HashMap[Long, AnyRef],
                       mutable.HashMap[Long, AnyRef]),
                    override implicit protected val task: String)
-  extends LSSVMModel(g, nPoints, featuredims, vertexMaps, edgeMaps, task) {
+  extends LSSVMModel(g, nPoints, featuredims, vertexMaps, edgeMaps, task) with
+  SubsampledDualLSSVM[FramedGraph[Graph], Iterable[CausalEdge]]{
 
-  var kernel :SVMKernel[DenseMatrix[Double]] = null
 
-  var (feature_a, b): (DenseMatrix[Double], DenseVector[Double]) = (null, null)
-
-  private var effectivedims = featuredims
-
-  override def applyKernel(kern: SVMKernel[DenseMatrix[Double]],
-                           M: Int = this.points.length):Unit = {
-    if(M != this.points.length) {
-      this.optimumSubset(M)
-    }
-    this.params = DenseVector.fill(M+1)(1.0)
-    effectivedims = M+1
-    kernel = kern
-  }
-
-  override def applyFeatureMap: Unit = {}
-
-  override def learn(): Unit = {
-    this.params =ConjugateGradient.runCG(feature_a, b,
-      this.initParams(), 0.0001,
-      this.params.length)
-  }
-
-  override def score(point: DenseVector[Double]): Double = {
-    val rescaled = rescale(point)
-    val prototypes = this.filterFeatures(p => this.points.contains(p))
-    params dot DenseVector(prototypes.map(p => this.kernel.evaluate(p, rescaled)).toArray :+ 1.0)
-  }
+  override protected var effectivedims = featuredims
 
   override def evaluateFold(params: DenseVector[Double])
                            (test_data_set: Iterable[CausalEdge])
                            (task: String): Metrics[Double, Double] = {
     var index: Int = 1
     val prototypes = this.filterFeatures(p => this.points.contains(p))
-    val scorepred: (DenseVector[Double]) => Double =
-      x => params dot DenseVector(prototypes.map(p => this.kernel.evaluate(p, x)).toArray :+ 1.0)
 
     val scoresAndLabels = test_data_set.map((e) => {
 
       val x = DenseVector(e.getPoint().getFeatureMap())
       val y = e.getLabel().getValue()
       index += 1
-      (scorepred(x(0 to -2)), y)
+      (score(x(0 to -2)), y)
     })
     Metrics(task)(scoresAndLabels.toList, index)
   }
@@ -97,6 +70,12 @@ class SDLSSVMModel(override protected val g: FramedGraph[Graph],
       this.evaluateFold(params)(this.filterXYEdges((p) => !this.points.contains(p)))(this.task)
     val ans = metrics.kpi()
     (ans(0), ans(1), ans(2))
+  }
+
+  override def score(point: DenseVector[Double]): Double = {
+    val rescaled = rescale(point)
+    val prototypes = this.getPrototypes()
+    params dot DenseVector(prototypes.map(p => this.kernel.evaluate(p, rescaled)).toArray :+ 1.0)
   }
 }
 

@@ -45,14 +45,7 @@ class LSSVMModel(
 
   private val sigmaInverse: DenseMatrix[Double] = inv(cholesky(variance))
 
-  val rescale = LSSVMModel.scaleAttributes(this.mean, sigmaInverse) _
-
-  def score(point: DenseVector[Double]): Double = {
-    val rescaled = rescale(point)
-    val phi = featureMap(rescaled)
-    val phic = DenseVector.vertcat(phi, DenseVector(1.0))
-    params dot phic
-  }
+  override val rescale = LSSVMModel.scaleAttributes(this.mean, sigmaInverse) _
 
   override def getRegParam: Double = this.optimizer.getRegParam
 

@@ -49,6 +49,22 @@ abstract class KernelSparkModel(data: RDD[LabeledPoint], task: String)
 
   val logger = Logger.getLogger(this.getClass)
 
+  override val rescale = (vec: DenseVector[Double]) => {
+    val mean = DenseVector(colStats.mean.toArray)
+    val variance = DenseVector(colStats.variance.toArray)
+    val ans = vec - mean
+    ans / sqrt(variance)
+  }
+
+  override def score(point: DenseVector[Double]): Double = {
+    val rescaled = rescale(point)
+    val phi = featureMap(rescaled)
+    val phic = DenseVector.vertcat(phi, DenseVector(1.0))
+    params dot phic
+  }
+
+  override def getPrototypes() = prototypes
+
   override def getXYEdges: RDD[LabeledPoint] = data
 
   def getRegParam: Double
